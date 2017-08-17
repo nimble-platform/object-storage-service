@@ -19,7 +19,6 @@ package wasdev.sample.servlet;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Map;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -27,6 +26,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.apache.commons.io.IOUtils;
 import org.openstack4j.api.OSClient.OSClientV3;
 import org.openstack4j.api.storage.ObjectStorageService;
@@ -34,7 +36,7 @@ import org.openstack4j.model.common.ActionResponse;
 import org.openstack4j.model.common.DLPayload;
 import org.openstack4j.model.common.Identifier;
 import org.openstack4j.model.common.Payload;
-import org.openstack4j.model.identity.v3.Region;
+import org.openstack4j.model.identity.v3.Token;
 import org.openstack4j.model.storage.object.SwiftObject;
 import org.openstack4j.openstack.OSFactory;
 
@@ -47,38 +49,80 @@ public class SimpleServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 
 	//Get these credentials from Bluemix by going to your Object Storage service, and clicking on Service Credentials:
-	private static final String USERNAME = "XXXX";
-	private static final String PASSWORD = "XXXX";
-	private static final String DOMAIN_ID = "XXXX";
-	private static final String PROJECT_ID = "XXXX";
-	private static final String OBJECT_STORAGE_AUTH_URL = "";
+	private static String USERNAME;
+	private static String PASSWORD;
+	private static String DOMAIN_ID;
+	private static String PROJECT_ID;
+	private static String OBJECT_STORAGE_AUTH_URL;
+//	private final String OBJECT_STORAGE_AUTH_URL = "https://lon-identity.open.softlayer.com/v3";
 
 //	Currently it is hardcoded to use one predefined container;
 	private static final String CONTAINER_NAME = "test";
+	private static Token token;
 
-	private static ObjectStorageService authenticateAndGetObjectStorageService() {
+	public SimpleServlet(){
+		System.out.println("Inside the class constructor - initializing vcap variables");
+		String vcapServices = System.getenv("VCAP_SERVICES");
+		if (vcapServices == null) {
+			throw new IllegalStateException("ERROR !!! - vcap services is null the service is running locally or not bind to object store service");
+		}
+		JsonObject jsonObject = (JsonObject) (new JsonParser().parse(vcapServices));
+		JsonArray osArray = jsonObject.getAsJsonArray("Object-Storage");
+		JsonObject credentials = osArray.get(0).getAsJsonObject().get("credentials").getAsJsonObject();
+		USERNAME = credentials.get("username").getAsString();
+		PASSWORD = credentials.get("password").getAsString();
+		DOMAIN_ID = credentials.get("domainId").getAsString();
+		PROJECT_ID = credentials.get("projectId").getAsString();
+		OBJECT_STORAGE_AUTH_URL = credentials.get("auth_url").getAsString() + "/v3";
 
+		token = getAccessToken();
+
+		System.out.println("Successfully set up the authentication variables");
+	}
+
+	private static Token getAccessToken() {
 		Identifier domainIdentifier = Identifier.byId(DOMAIN_ID);
-		
+
 		System.out.println("Authenticating against - " + OBJECT_STORAGE_AUTH_URL);
 
 		OSClientV3 os = OSFactory.builderV3()
 				.endpoint(OBJECT_STORAGE_AUTH_URL)
-				.credentials(USERNAME,PASSWORD, domainIdentifier)
+				.credentials(USERNAME, PASSWORD, domainIdentifier)
 				.scopeToProject(Identifier.byId(PROJECT_ID))
 				.authenticate();
 
 		System.out.println("Authenticated successfully!");
 
-		return os.objectStorage();
+		System.out.println("Creating token");
+		return os.getToken();
 	}
+
+//	private ObjectStorageService authenticateAndGetObjectStorageService() {
+//
+//		Identifier domainIdentifier = Identifier.byId(DOMAIN_ID);
+//
+//		System.out.println("Authenticating against - " + OBJECT_STORAGE_AUTH_URL);
+//
+//		OSClientV3 os = OSFactory.builderV3()
+//				.endpoint(OBJECT_STORAGE_AUTH_URL)
+//				.credentials(USERNAME, PASSWORD, domainIdentifier)
+//				.scopeToProject(Identifier.byId(PROJECT_ID))
+//				.authenticate();
+//
+//		System.out.println("Authenticated successfully!");
+//
+//		return os.objectStorage();
+//	}
 
 	/**
 	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
 	 */
 	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		ObjectStorageService objectStorage = authenticateAndGetObjectStorageService();
+//		ObjectStorageService objectStorage = authenticateAndGetObjectStorageService();
+//		System.out.println("The token is " + token.toString());
+		ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
+
 		String fileName = request.getParameter("file");
 		
 		System.out.println(String.format("Retrieving file '%s' from ObjectStorage...", fileName));
@@ -112,7 +156,8 @@ public class SimpleServlet extends HttpServlet {
 
 	@Override
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		ObjectStorageService objectStorage = authenticateAndGetObjectStorageService();
+//		ObjectStorageService objectStorage = authenticateAndGetObjectStorageService();
+		ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
 
 		String fileName = request.getParameter("file");
         
@@ -166,7 +211,8 @@ public class SimpleServlet extends HttpServlet {
 
 	@Override
 	protected void doDelete(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		ObjectStorageService objectStorage = authenticateAndGetObjectStorageService();
+//		ObjectStorageService objectStorage = authenticateAndGetObjectStorageService();
+		ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
 
 		String fileName = request.getParameter("file");
 
