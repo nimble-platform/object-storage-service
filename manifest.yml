@@ -1,0 +1,7 @@
+applications:
+- path: target/ObjectStorageSampleServer.war
+  memory: 512M
+  instances: 1
+  domain: eu-gb.mybluemix.net	
+  host: object-store-app
+  name: object-store-app

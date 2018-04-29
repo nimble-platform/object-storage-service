@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: object-store
+  name: object-store
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: object-store
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  revisionHistoryLimit: 2
+  template:
+    metadata:
+      labels:
+        app: object-store
+    spec:
+      containers:
+      - image: nimbleplatform/object-store:IMAGE_TAG
+        imagePullPolicy: Always
+        name: object-store
+        env:
+        - name: OBJECT_STORE_CREDENTIALS
+          valueFrom:
+            secretKeyRef:
+              name: object-store-credentials
+              key: credentials.json
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
