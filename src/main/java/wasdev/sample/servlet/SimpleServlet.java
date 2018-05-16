@@ -118,7 +118,7 @@ public class SimpleServlet extends HttpServlet {
         response.setContentType(mimeType);
 
 //        response.setContentType("application/x-msdownload");
-//        response.setHeader("Content-disposition", "attachment; filename=" + fileName);
+        response.setHeader("Content-disposition", "inline; filename=" + fileName);
 
         DLPayload payload = fileObj.download();
 
