@@ -26,6 +26,7 @@ import org.openstack4j.model.common.Identifier;
 import org.openstack4j.model.common.Payloads;
 import org.openstack4j.model.identity.v3.Token;
 import org.openstack4j.model.storage.object.SwiftObject;
+import org.openstack4j.model.storage.object.options.ObjectPutOptions;
 import org.openstack4j.openstack.OSFactory;
 
 import javax.servlet.ServletException;
@@ -135,18 +136,20 @@ public class SimpleServlet extends HttpServlet {
         ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
 
         String fileName = getFilenameFromPath(request);
-
-        System.out.println(String.format("Storing file '%s' in ObjectStorage...", fileName));
-
         if (fileName == null) { //No file was specified to be found
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             System.out.println("File not found.");
             return;
         }
 
+        String mimeType = request.getHeader("Content-Type");
+        ObjectPutOptions options = ObjectPutOptions.create().contentType(mimeType);
+
+        System.out.println(String.format("Storing file '%s' with mime type '%s' in ObjectStorage...", fileName, mimeType));
+
         final InputStream fileStream = request.getInputStream();
 
-        objectStorage.objects().put(CONTAINER_NAME, fileName, Payloads.create(fileStream));
+        objectStorage.objects().put(CONTAINER_NAME, fileName, Payloads.create(fileStream), options);
 
         System.out.println("Successfully stored file in ObjectStorage!");
     }
