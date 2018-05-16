@@ -23,7 +23,7 @@ import org.openstack4j.api.storage.ObjectStorageService;
 import org.openstack4j.model.common.ActionResponse;
 import org.openstack4j.model.common.DLPayload;
 import org.openstack4j.model.common.Identifier;
-import org.openstack4j.model.common.Payload;
+import org.openstack4j.model.common.Payloads;
 import org.openstack4j.model.identity.v3.Token;
 import org.openstack4j.model.storage.object.SwiftObject;
 import org.openstack4j.openstack.OSFactory;
@@ -47,13 +47,6 @@ import java.io.OutputStream;
 public class SimpleServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
-    //Get these credentials from Bluemix by going to your Object Storage service, and clicking on Service Credentials:
-    private static String USERNAME;
-    private static String PASSWORD;
-    private static String DOMAIN_ID;
-    private static String PROJECT_ID;
-    private static String OBJECT_STORAGE_AUTH_URL;
-
     //	Currently it is hardcoded to use one predefined container;
     private static final String CONTAINER_NAME = "test";
     private static Token token;
@@ -64,51 +57,28 @@ public class SimpleServlet extends HttpServlet {
             throw new IllegalStateException("ERROR !!! - Missing object store credentials environment variable");
         }
         ObjectStoreCredentials credentials = (new Gson()).fromJson(credentialsJson, ObjectStoreCredentials.class);
-
-        USERNAME = credentials.getUsername();
-        PASSWORD = credentials.getPassword();
-        DOMAIN_ID = credentials.getDomainId();
-        PROJECT_ID = credentials.getProjectId();
-        OBJECT_STORAGE_AUTH_URL = credentials.getAuth_url() + "/v3";
-
-        token = getAccessToken();
+        token = getAccessToken(credentials);
 
         System.out.println("Successfully set up the authentication variables");
     }
 
-    private static Token getAccessToken() {
-        Identifier domainIdentifier = Identifier.byId(DOMAIN_ID);
+    private static Token getAccessToken(ObjectStoreCredentials creds) {
+        Identifier domainIdentifier = Identifier.byId(creds.getDomainId());
 
-        System.out.println("Authenticating against - " + OBJECT_STORAGE_AUTH_URL);
+        String authUrl = creds.getAuth_url() + "/v3";
+        System.out.println("Authenticating against - " + authUrl);
 
         OSClientV3 os = OSFactory.builderV3()
-                .endpoint(OBJECT_STORAGE_AUTH_URL)
-                .credentials(USERNAME, PASSWORD, domainIdentifier)
-                .scopeToProject(Identifier.byId(PROJECT_ID))
+                .endpoint(authUrl)
+                .credentials(creds.getUsername(), creds.getPassword(), domainIdentifier)
+                .scopeToProject(Identifier.byId(creds.getProjectId()))
                 .authenticate();
 
-        System.out.println("Authenticated successfully!");
+        System.out.println("Authenticated successfully! - Creating token");
+        os.useRegion(creds.getRegion());
 
-        System.out.println("Creating token");
         return os.getToken();
     }
-
-//	private ObjectStorageService authenticateAndGetObjectStorageService() {
-//
-//		Identifier domainIdentifier = Identifier.byId(DOMAIN_ID);
-//
-//		System.out.println("Authenticating against - " + OBJECT_STORAGE_AUTH_URL);
-//
-//		OSClientV3 os = OSFactory.builderV3()
-//				.endpoint(OBJECT_STORAGE_AUTH_URL)
-//				.credentials(USERNAME, PASSWORD, domainIdentifier)
-//				.scopeToProject(Identifier.byId(PROJECT_ID))
-//				.authenticate();
-//
-//		System.out.println("Authenticated successfully!");
-//
-//		return os.objectStorage();
-//	}
 
     private String getFilenameFromPath(HttpServletRequest request) {
         String pathInfo = request.getPathInfo();
@@ -121,6 +91,7 @@ public class SimpleServlet extends HttpServlet {
      */
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+//      TODO: add uje region after the client is created os.useRegion(creds.getRegion());
         ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
         String fileName = getFilenameFromPath(request);
 
@@ -140,10 +111,13 @@ public class SimpleServlet extends HttpServlet {
             return;
         }
 
-//		String mimeType = fileObj.getMimeType();
-//		System.out.println("Mime type = " + mimeType);
+        String mimeType = fileObj.getMimeType();
+        System.out.println("Mime type = " + mimeType);
 
-        response.setContentType("application/x-msdownload");
+        response.setContentType(mimeType);
+
+
+//        response.setContentType("application/x-msdownload");
         response.setHeader("Content-disposition", "attachment; filename=" + fileName);
 
         DLPayload payload = fileObj.download();
@@ -154,12 +128,6 @@ public class SimpleServlet extends HttpServlet {
         }
 
         System.out.println("Successfully retrieved file from ObjectStorage!");
-//        Response.ok(new StreamingOutput() {
-//            @Override
-//            public void write(OutputStream output) throws IOException, WebApplicationException {
-//
-//            }
-//        });
     }
 
     @Override
@@ -170,7 +138,7 @@ public class SimpleServlet extends HttpServlet {
 
         System.out.println(String.format("Storing file '%s' in ObjectStorage...", fileName));
 
-        if (fileName == null) { //No file was specified to be found, or container name is missing
+        if (fileName == null) { //No file was specified to be found
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             System.out.println("File not found.");
             return;
@@ -178,42 +146,9 @@ public class SimpleServlet extends HttpServlet {
 
         final InputStream fileStream = request.getInputStream();
 
-        Payload<InputStream> payload = new PayloadClass(fileStream);
-        objectStorage.objects().put(CONTAINER_NAME, fileName, payload);
+        objectStorage.objects().put(CONTAINER_NAME, fileName, Payloads.create(fileStream));
 
         System.out.println("Successfully stored file in ObjectStorage!");
-    }
-
-    private class PayloadClass implements Payload<InputStream> {
-        private InputStream stream;
-
-        PayloadClass(InputStream stream) {
-            this.stream = stream;
-        }
-
-        @Override
-        public void close() throws IOException {
-            stream.close();
-        }
-
-        @Override
-        public InputStream open() {
-            return stream;
-        }
-
-        @Override
-        public void closeQuietly() {
-            try {
-                stream.close();
-            } catch (IOException e) {
-            }
-        }
-
-        @Override
-        public InputStream getRaw() {
-            return stream;
-        }
-
     }
 
     @Override

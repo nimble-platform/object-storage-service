@@ -68,4 +68,20 @@ public class ObjectStoreCredentials {
     public String getRole() {
         return role;
     }
+
+    @Override
+    public String toString() {
+        return "ObjectStoreCredentials{" +
+                "auth_url='" + auth_url + '\'' +
+                ", project='" + project + '\'' +
+                ", projectId='" + projectId + '\'' +
+                ", region='" + region + '\'' +
+                ", userId='" + userId + '\'' +
+                ", username='" + username + '\'' +
+                ", password='" + password + '\'' +
+                ", domainId='" + domainId + '\'' +
+                ", domainName='" + domainName + '\'' +
+                ", role='" + role + '\'' +
+                '}';
+    }
 }
