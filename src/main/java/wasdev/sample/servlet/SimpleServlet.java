@@ -113,11 +113,11 @@ public class SimpleServlet extends HttpServlet {
         }
 
         String mimeType = fileObj.getMimeType();
-        System.out.println("Mime type = " + mimeType);
+//        System.out.println("Mime type = " + mimeType);
 
         response.setContentType(mimeType);
 
-//        response.setContentType("application/x-msdownload");
+        response.setContentType("application/x-msdownload");
         response.setHeader("Content-disposition", "inline; filename=" + fileName);
 
         DLPayload payload = fileObj.download();
