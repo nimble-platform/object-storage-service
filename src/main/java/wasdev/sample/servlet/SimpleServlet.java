@@ -113,9 +113,11 @@ public class SimpleServlet extends HttpServlet {
             return;
         }
 
-        response.setContentType("multipart/form-data");
+//        response.setContentType("multipart/form-data");
 //        response.setHeader("Content-Type", fileObj.getMimeType());
-        response.setHeader("Content-Disposition", "form-data; filename=" + fileName);
+//        response.setHeader("Content-Disposition", "form-data; filename=" + fileName);
+        response.setContentType("application/x-msdownload");
+        response.setHeader("Content-disposition", "attachment; filename=" + fileName);
 
         DLPayload payload = fileObj.download();
 //        String length = payload.getHttpResponse().header("Content-Length");
