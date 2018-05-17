@@ -153,10 +153,10 @@ public class SimpleServlet extends HttpServlet {
             System.out.println(String.format("%s=%s", h, request.getHeader(h)));
         }
 
-        String mimeType = request.getContentType().split(";")[0];
-        ObjectPutOptions options = ObjectPutOptions.create().contentType(mimeType);
+//        String mimeType = request.getContentType().split(";")[0];
+        ObjectPutOptions options = ObjectPutOptions.create().contentType(request.getContentType());
 
-        System.out.println(String.format("Storing file '%s' with mime type '%s' in ObjectStorage...", fileName, mimeType));
+        System.out.println(String.format("Storing file '%s' with mime type '%s' in ObjectStorage...", fileName, request.getContentType()));
 
         final InputStream fileStream = request.getInputStream();
 
