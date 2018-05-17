@@ -114,11 +114,12 @@ public class SimpleServlet extends HttpServlet {
 
         response.setContentType("application/x-msdownload");
         response.setHeader("Content-Type", fileObj.getMimeType());
-        response.setHeader("Content-Length", fileObj.getMimeType());
         response.setHeader("Content-disposition", "inline; filename=" + fileName);
 
         DLPayload payload = fileObj.download();
         String length = payload.getHttpResponse().header("Content-Length");
+        response.setHeader("Content-Length", length);
+
         System.out.println(length);
         try (InputStream in = payload.getInputStream();
              OutputStream out = response.getOutputStream()) {
