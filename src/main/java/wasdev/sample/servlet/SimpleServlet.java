@@ -37,6 +37,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Enumeration;
 
 /**
  * This servlet implements the /objectStorage endpoint that supports GET, POST and DELETE
@@ -144,6 +145,12 @@ public class SimpleServlet extends HttpServlet {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             System.out.println("File not found.");
             return;
+        }
+
+        Enumeration<String> headers = request.getHeaderNames();
+        while (headers.hasMoreElements()) {
+            String h = headers.nextElement();
+            System.out.println(String.format("%s=%s", h, request.getHeader(h)));
         }
 
         String mimeType = request.getContentType().split(";")[0];
