@@ -115,20 +115,20 @@ public class SimpleServlet extends HttpServlet {
 
         response.setContentType("application/html");
 //        response.setHeader("Content-Type", fileObj.getMimeType());
-        response.setHeader("Content-disposition", "inline; filename=" + fileName);
+        response.setHeader("Content-Disposition", "inline; filename=" + fileName);
 
         DLPayload payload = fileObj.download();
-        String length = payload.getHttpResponse().header("Content-Length");
-        response.setHeader("Content-Length", length);
+//        String length = payload.getHttpResponse().header("Content-Length");
+//        response.setHeader("Content-Length", length);
 
-        System.out.println(length);
+//        System.out.println(length);
         try (InputStream in = payload.getInputStream();
              OutputStream out = response.getOutputStream()) {
             IOUtils.copy(in, out);
         }
 
-        String mimeType = fileObj.getMimeType();
-        System.out.println("Mime type = " + mimeType);
+//        String mimeType = fileObj.getMimeType();
+//        System.out.println("Mime type = " + mimeType);
 
 //        response.setContentType(mimeType);
 
