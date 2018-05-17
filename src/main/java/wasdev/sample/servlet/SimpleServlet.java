@@ -113,7 +113,7 @@ public class SimpleServlet extends HttpServlet {
             return;
         }
 
-        response.setContentType("application/html");
+        response.setContentType("text/html");
 //        response.setHeader("Content-Type", fileObj.getMimeType());
         response.setHeader("Content-Disposition", "inline; filename=" + fileName);
 
