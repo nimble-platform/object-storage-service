@@ -113,13 +113,13 @@ public class SimpleServlet extends HttpServlet {
             return;
         }
 
-        response.setContentType("text/html");
+        response.setContentType("image/jpeg");
 //        response.setHeader("Content-Type", fileObj.getMimeType());
-        response.setHeader("Content-Disposition", "inline; filename=" + fileName);
+        response.setHeader("Content-Disposition", "form-data; filename=" + fileName);
 
         DLPayload payload = fileObj.download();
-//        String length = payload.getHttpResponse().header("Content-Length");
-//        response.setHeader("Content-Length", length);
+        String length = payload.getHttpResponse().header("Content-Length");
+        response.setHeader("Content-Length", length);
 
 //        System.out.println(length);
         try (InputStream in = payload.getInputStream();
