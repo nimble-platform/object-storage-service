@@ -113,8 +113,8 @@ public class SimpleServlet extends HttpServlet {
             return;
         }
 
-        response.setContentType("application/x-msdownload");
-        response.setHeader("Content-Type", fileObj.getMimeType());
+        response.setContentType("application/html");
+//        response.setHeader("Content-Type", fileObj.getMimeType());
         response.setHeader("Content-disposition", "inline; filename=" + fileName);
 
         DLPayload payload = fileObj.download();
@@ -153,10 +153,10 @@ public class SimpleServlet extends HttpServlet {
             System.out.println(String.format("%s=%s", h, request.getHeader(h)));
         }
 
-//        String mimeType = request.getContentType().split(";")[0];
-        ObjectPutOptions options = ObjectPutOptions.create().contentType(request.getContentType());
+        String mimeType = request.getContentType().split(";")[0];
+        ObjectPutOptions options = ObjectPutOptions.create().contentType(mimeType);
 
-        System.out.println(String.format("Storing file '%s' with mime type '%s' in ObjectStorage...", fileName, request.getContentType()));
+        System.out.println(String.format("Storing file '%s' with mime type '%s' in ObjectStorage...", fileName, mimeType));
 
         final InputStream fileStream = request.getInputStream();
 
