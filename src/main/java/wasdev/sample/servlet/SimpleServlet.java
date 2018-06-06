@@ -19,6 +19,7 @@ package wasdev.sample.servlet;
 import com.google.gson.Gson;
 import com.sun.jersey.spi.resource.Singleton;
 import org.apache.commons.io.IOUtils;
+import org.apache.log4j.Logger;
 import org.openstack4j.api.OSClient.OSClientV3;
 import org.openstack4j.api.storage.ObjectStorageService;
 import org.openstack4j.model.common.ActionResponse;
@@ -49,6 +50,8 @@ import java.util.Enumeration;
         loadOnStartup = 1)
 @Singleton
 public class SimpleServlet extends HttpServlet {
+    private final static Logger logger = Logger.getLogger(SimpleServlet.class);
+
     private static final long serialVersionUID = 1L;
 
     //	Currently it is hardcoded to use one predefined container;
@@ -63,16 +66,16 @@ public class SimpleServlet extends HttpServlet {
         ObjectStoreCredentials credentials = (new Gson()).fromJson(credentialsJson, ObjectStoreCredentials.class);
         token = getAccessToken(credentials);
 
-        System.out.println(token.getExpires());
-
-        System.out.println("Successfully set up the authentication variables");
+        logger.info("Token expires: " + token.getExpires());
     }
 
     private static Token getAccessToken(ObjectStoreCredentials creds) {
         Identifier domainIdentifier = Identifier.byId(creds.getDomainId());
 
         String authUrl = creds.getAuth_url() + "/v3";
-        System.out.println("Authenticating against - " + authUrl);
+        logger.info("Authenticating against - " + authUrl);
+
+        OSFactory.enableHttpLoggingFilter(true);
 
         OSClientV3 os = OSFactory.builderV3()
                 .endpoint(authUrl)
@@ -80,8 +83,9 @@ public class SimpleServlet extends HttpServlet {
                 .scopeToProject(Identifier.byId(creds.getProjectId()))
                 .authenticate();
 
-        System.out.println("Authenticated successfully! - Creating token");
         os.useRegion(creds.getRegion());
+
+        logger.info("Authenticated successfully! - Creating token");
 
         return os.getToken();
     }
@@ -97,7 +101,7 @@ public class SimpleServlet extends HttpServlet {
      */
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        System.out.println(token.getExpires());
+        logger.info("Token expires: " + token.getExpires());
 
         ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
         String fileName = getFilenameFromPath(request);
@@ -140,38 +144,38 @@ public class SimpleServlet extends HttpServlet {
 //        response.setContentType(mimeType);
 
 
-        System.out.println("Successfully retrieved file from ObjectStorage!");
+        logger.info("Successfully retrieved file from ObjectStorage!");
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        System.out.println(token.getExpires());
+        logger.info("Token expires: " + token.getExpires());
 
         ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
 
         String fileName = getFilenameFromPath(request);
         if (fileName == null) { //No file was specified to be found
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
-            System.out.println("File not found.");
+            logger.info("File not found.");
             return;
         }
 
         Enumeration<String> headers = request.getHeaderNames();
         while (headers.hasMoreElements()) {
             String h = headers.nextElement();
-            System.out.println(String.format("%s=%s", h, request.getHeader(h)));
+            logger.info(String.format("%s=%s", h, request.getHeader(h)));
         }
 
         String mimeType = request.getContentType().split(";")[0];
         ObjectPutOptions options = ObjectPutOptions.create().contentType(mimeType);
 
-        System.out.println(String.format("Storing file '%s' with mime type '%s' in ObjectStorage...", fileName, mimeType));
+        logger.info(String.format("Storing file '%s' with mime type '%s' in ObjectStorage...", fileName, mimeType));
 
         final InputStream fileStream = request.getInputStream();
 
         objectStorage.objects().put(CONTAINER_NAME, fileName, Payloads.create(fileStream), options);
 
-        System.out.println("Successfully stored file in ObjectStorage!");
+        logger.info("Successfully stored file in ObjectStorage!");
     }
 
     @Override
@@ -179,11 +183,11 @@ public class SimpleServlet extends HttpServlet {
         ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
         String fileName = getFilenameFromPath(request);
 
-        System.out.println(String.format("Deleting file '%s' from ObjectStorage...", fileName));
+        logger.info(String.format("Deleting file '%s' from ObjectStorage...", fileName));
 
         if (fileName == null) { //No file was specified to be found, or container name is missing
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
-            System.out.println("File not found.");
+            logger.info("File not found.");
             return;
         }
 
@@ -191,10 +195,10 @@ public class SimpleServlet extends HttpServlet {
 
         if (!deleteResponse.isSuccess()) {
             response.sendError(deleteResponse.getCode());
-            System.out.println("Delete failed: " + deleteResponse.getFault());
+            logger.info("Delete failed: " + deleteResponse.getFault());
         } else {
             response.setStatus(HttpServletResponse.SC_OK);
-            System.out.println("Successfully deleted file from ObjectStorage!");
+            logger.info("Successfully deleted file from ObjectStorage!");
         }
     }
 }

@@ -10,6 +10,6 @@
         <tcpOptions soReuseAddr="true"/>
     </httpEndpoint>
 
-    <application name="object-store" context-root="/BluemixObjectStorageLibertySampleApp" location="${appLocation}" type="war"/>
+    <application name="object-store" context-root="/object-store" location="${appLocation}" type="war"/>
 
 </server>
