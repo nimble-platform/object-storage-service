@@ -17,6 +17,7 @@
 package wasdev.sample.servlet;
 
 import com.google.gson.Gson;
+import com.sun.jersey.spi.resource.Singleton;
 import org.apache.commons.io.IOUtils;
 import org.openstack4j.api.OSClient.OSClientV3;
 import org.openstack4j.api.storage.ObjectStorageService;
@@ -46,6 +47,7 @@ import java.util.Enumeration;
 @WebServlet(
         urlPatterns = "/*",
         loadOnStartup = 1)
+@Singleton
 public class SimpleServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
@@ -60,6 +62,8 @@ public class SimpleServlet extends HttpServlet {
         }
         ObjectStoreCredentials credentials = (new Gson()).fromJson(credentialsJson, ObjectStoreCredentials.class);
         token = getAccessToken(credentials);
+
+        System.out.println(token.getExpires());
 
         System.out.println("Successfully set up the authentication variables");
     }
@@ -93,7 +97,8 @@ public class SimpleServlet extends HttpServlet {
      */
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-//      TODO: add uje region after the client is created os.useRegion(creds.getRegion());
+        System.out.println(token.getExpires());
+
         ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
         String fileName = getFilenameFromPath(request);
 
@@ -140,6 +145,8 @@ public class SimpleServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        System.out.println(token.getExpires());
+
         ObjectStorageService objectStorage = OSFactory.clientFromToken(token).objectStorage();
 
         String fileName = getFilenameFromPath(request);
@@ -190,5 +197,4 @@ public class SimpleServlet extends HttpServlet {
             System.out.println("Successfully deleted file from ObjectStorage!");
         }
     }
-
 }
