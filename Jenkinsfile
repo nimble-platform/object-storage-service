@@ -1,6 +1,6 @@
 node ('nimble-jenkins-slave') {
     stage('Download Latest') {
-        git(url: 'https://github.com/nimble-platform/object-storage-app.git', branch: 'master')
+        git(url: 'https://github.com/nimble-platform/object-storage-service.git', branch: 'master')
     }
 
     stage ('Build docker image') {
