@@ -17,6 +17,10 @@
 package wasdev.sample.servlet;
 
 import com.google.gson.Gson;
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
+import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
 import org.openstack4j.api.storage.ObjectStorageService;
@@ -35,6 +39,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Enumeration;
 
 /**
  * This servlet implements the /objectStorage endpoint that supports GET, POST and DELETE
@@ -87,58 +92,89 @@ public class SimpleServlet extends HttpServlet {
 
         if (fileObj == null) { //The specified file was not found
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
-            logger.error("File not found.");
+            logger.error(fileName + " Wasn't found in Object Storage");
             return;
         }
 
-//        response.setContentType("multipart/form-data");
-//        response.setHeader("Content-Type", fileObj.getMimeType());
-//        response.setHeader("Content-Disposition", "form-data; filename=" + fileName);
-        response.setContentType("application/x-msdownload");
-        response.setHeader("Content-disposition", "attachment; filename=" + fileName);
+
+        logger.info(String.format("Sending file '%s' with mime-type '%s' and size '%s' B", fileName, fileObj.getMimeType(), fileObj.getSizeInBytes()));
+
+        response.setContentType(fileObj.getMimeType());
+        response.setHeader("Content-disposition", "inline; filename=" + fileName);
 
         DLPayload payload = fileObj.download();
-//        String length = payload.getHttpResponse().header("Content-Length");
-//        response.setHeader("Content-Length", length);
 
         try (InputStream in = payload.getInputStream();
              OutputStream out = response.getOutputStream()) {
-            IOUtils.copy(in, out);
+            long copied = IOUtils.copy(in, out);
+            logger.info(String.format("For file '%s' were copied '%d' bytes", fileName, copied));
         }
 
-//        String mimeType = fileObj.getMimeType();
-//        response.setContentType(mimeType);
-
-        logger.info("Successfully retrieved file from ObjectStorage!");
+        logger.info(fileName + " was successfully retrieved from ObjectStorage");
     }
 
+    //    TODO: maybe change to the native servlet API
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
-
         String fileName = getFilenameFromPath(request);
         if (fileName == null) { //No file was specified to be found
-            response.sendError(HttpServletResponse.SC_NOT_FOUND);
-            logger.info("File not found.");
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+            response.getOutputStream().print("Must provide a filename");
+            logger.info("Sent empty file name");
             return;
         }
 
-//        Enumeration<String> headers = request.getHeaderNames();
-//        while (headers.hasMoreElements()) {
-//            String h = headers.nextElement();
-//            logger.info(String.format("%s=%s", h, request.getHeader(h)));
-//        }
+        try {
+            if (ServletFileUpload.isMultipartContent(request)) {
+                handleMultiPart(request, objectStorage, fileName);
+            } else {
+                handleWithContentType(request, objectStorage, fileName);
+            }
 
+            logger.info(String.format("Successfully stored file '%s' in ObjectStorage!", fileName));
+            response.setStatus(HttpServletResponse.SC_OK);
+        } catch (Exception e) {
+            logger.error("Exception during store of the file - " + fileName, e);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+
+    }
+
+    private void printHeaders(HttpServletRequest request) {
+        Enumeration<String> headers = request.getHeaderNames();
+        while (headers.hasMoreElements()) {
+            String h = headers.nextElement();
+            logger.info(String.format("%s = %s", h, request.getHeader(h)));
+        }
+    }
+
+    private void handleWithContentType(HttpServletRequest request, ObjectStorageService objectStorage, String fileName) throws IOException {
         String mimeType = request.getContentType().split(";")[0];
-        ObjectPutOptions options = ObjectPutOptions.create().contentType(mimeType);
-
         logger.info(String.format("Storing file '%s' with mime type '%s' in ObjectStorage...", fileName, mimeType));
 
+        ObjectPutOptions options = ObjectPutOptions.create().contentType(mimeType);
         final InputStream fileStream = request.getInputStream();
 
         objectStorage.objects().put(CONTAINER_NAME, fileName, Payloads.create(fileStream), options);
+    }
 
-        logger.info("Successfully stored file in ObjectStorage!");
+    private void handleMultiPart(HttpServletRequest request, ObjectStorageService objectStorage, String fileName) throws FileUploadException, IOException {
+        logger.info(String.format("Storing file '%s' as part of multipart in Object Storage...", fileName));
+
+        ServletFileUpload fileUpload = new ServletFileUpload();
+        FileItemIterator items = fileUpload.getItemIterator(request);
+        ObjectPutOptions options;
+
+        while (items.hasNext()) {
+            FileItemStream item = items.next();
+            logger.info(String.format("Content=%s , Name=%s, field=%s", item.getContentType(), item.getName(), item.getFieldName()));
+            options = ObjectPutOptions.create().contentType(item.getContentType());
+            if (!item.isFormField()) {
+                InputStream is = item.openStream();
+                objectStorage.objects().put(CONTAINER_NAME, fileName, Payloads.create(is), options);
+            }
+        }
     }
 
     @Override
