@@ -25,7 +25,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
 import org.openstack4j.api.storage.ObjectStorageService;
 import org.openstack4j.model.common.ActionResponse;
-import org.openstack4j.model.common.DLPayload;
 import org.openstack4j.model.common.Payloads;
 import org.openstack4j.model.storage.object.SwiftObject;
 import org.openstack4j.model.storage.object.options.ObjectPutOptions;
@@ -59,7 +58,7 @@ public class SimpleServlet extends HttpServlet {
 
     static {
         String credentialsJson = System.getenv("OBJECT_STORE_CREDENTIALS");
-        if (credentialsJson == null) {
+        if (isNullOrEmpty(credentialsJson)) {
             throw new IllegalStateException("ERROR !!! - Missing object store credentials environment variable");
         }
         ObjectStoreCredentials credentials = (new Gson()).fromJson(credentialsJson, ObjectStoreCredentials.class);
@@ -73,6 +72,10 @@ public class SimpleServlet extends HttpServlet {
         return (tmp.isEmpty() ? null : tmp);
     }
 
+    private static boolean isNullOrEmpty(String s) {
+        return s == null || s.isEmpty();
+    }
+
     /**
      * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
      */
@@ -81,7 +84,7 @@ public class SimpleServlet extends HttpServlet {
         ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
         String fileName = getFilenameFromPath(request);
 
-        if (fileName == null) { //No file was given at the path
+        if (isNullOrEmpty(fileName)) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             logger.error("File name was not specified.");
             return;
@@ -95,50 +98,24 @@ public class SimpleServlet extends HttpServlet {
             logger.error(fileName + " Wasn't found in Object Storage");
             return;
         }
-
-
-        logger.info(String.format("Sending file '%s' with mime-type '%s' and size '%s' B", fileName, fileObj.getMimeType(), fileObj.getSizeInBytes()));
+        long fileSize = fileObj.getSizeInBytes();
+        logger.info(String.format("Sending file '%s' with mime-type '%s' and size '%s' B", fileName, fileObj.getMimeType(), fileSize));
 
         response.setContentType(fileObj.getMimeType());
         response.setHeader("Content-disposition", "inline; filename=" + fileName);
 
-        DLPayload payload = fileObj.download();
-
-        try (InputStream in = payload.getInputStream();
+        try (InputStream in = fileObj.download().getInputStream();
              OutputStream out = response.getOutputStream()) {
             long copied = IOUtils.copy(in, out);
-            logger.info(String.format("For file '%s' were copied '%d' bytes", fileName, copied));
-        }
-
-        logger.info(fileName + " was successfully retrieved from ObjectStorage");
-    }
-
-    //    TODO: maybe change to the native servlet API
-    @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
-        String fileName = getFilenameFromPath(request);
-        if (fileName == null) { //No file was specified to be found
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST);
-            response.getOutputStream().print("Must provide a filename");
-            logger.info("Sent empty file name");
-            return;
-        }
-
-        try {
-            if (ServletFileUpload.isMultipartContent(request)) {
-                handleMultiPart(request, objectStorage, fileName);
-            } else {
-                handleWithContentType(request, objectStorage, fileName);
+            if (copied != fileSize) {
+                throw new RuntimeException("Failed to read all the bytes for file - " + fileName);
             }
-
-            logger.info(String.format("Successfully stored file '%s' in ObjectStorage!", fileName));
+            logger.info(String.format("File '%s' was successfully sent with size '%d' bytes", fileName, copied));
             response.setStatus(HttpServletResponse.SC_OK);
         } catch (Exception e) {
-            logger.error("Exception during store of the file - " + fileName, e);
+            logger.error("Error during read of file - " + fileName, e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
-
     }
 
     private void printHeaders(HttpServletRequest request) {
@@ -177,24 +154,51 @@ public class SimpleServlet extends HttpServlet {
         }
     }
 
+    //    TODO: maybe change to the native servlet API
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
+        String fileName = getFilenameFromPath(request);
+        if (isNullOrEmpty(fileName)) { //No file was specified
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+            response.getOutputStream().print("Must provide a filename");
+            logger.info("Sent empty file name");
+            return;
+        }
+
+        try {
+            if (ServletFileUpload.isMultipartContent(request)) {
+                handleMultiPart(request, objectStorage, fileName);
+            } else {
+                handleWithContentType(request, objectStorage, fileName);
+            }
+
+            logger.info(String.format("Successfully stored file '%s' in ObjectStorage!", fileName));
+            response.setStatus(HttpServletResponse.SC_CREATED);
+        } catch (Exception e) {
+            logger.error("Exception during store of the file - " + fileName, e);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+
+    }
+
     @Override
     protected void doDelete(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
         String fileName = getFilenameFromPath(request);
 
-        logger.info(String.format("Deleting file '%s' from ObjectStorage...", fileName));
-
-        if (fileName == null) { //No file was specified to be found, or container name is missing
+        if (isNullOrEmpty(fileName)) { //No file was specified to be found, or container name is missing
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             logger.info("File not found.");
             return;
         }
 
+        logger.info(String.format("Deleting file '%s' from ObjectStorage...", fileName));
         ActionResponse deleteResponse = objectStorage.objects().delete(CONTAINER_NAME, fileName);
 
         if (!deleteResponse.isSuccess()) {
             response.sendError(deleteResponse.getCode());
-            logger.info("Delete failed: " + deleteResponse.getFault());
+            logger.info("Delete failed for file - " + fileName + " due to: " + deleteResponse.getFault());
         } else {
             response.setStatus(HttpServletResponse.SC_OK);
             logger.info("Successfully deleted file from ObjectStorage!");

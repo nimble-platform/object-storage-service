@@ -62,16 +62,19 @@ public class TokensGenerator {
     }
 
     private void setOSBuilder(ObjectStoreCredentials credentials) {
-        String authUrl = credentials.getAuth_url() + "/v3";
-        logger.info("Authenticating against - " + authUrl);
+        try {
+            String authUrl = credentials.getAuth_url() + "/v3";
+            logger.info("Authenticating against - " + authUrl);
 
-        Identifier domainIdentifier = Identifier.byId(credentials.getDomainId());
-        builder = OSFactory.builderV3()
-                .endpoint(authUrl)
-                .credentials(credentials.getUsername(), credentials.getPassword(), domainIdentifier)
-                .scopeToProject(Identifier.byId(credentials.getProjectId()));
+            Identifier domainIdentifier = Identifier.byId(credentials.getDomainId());
+            builder = OSFactory.builderV3()
+                    .endpoint(authUrl)
+                    .credentials(credentials.getUsername(), credentials.getPassword(), domainIdentifier)
+                    .scopeToProject(Identifier.byId(credentials.getProjectId()));
 
-
-        logger.info("Authenticated and created client successfully!");
+            logger.info("Authenticated and created client successfully!");
+        } catch (Exception e) {
+            logger.error("Error during authentication to Object storage", e);
+        }
     }
 }

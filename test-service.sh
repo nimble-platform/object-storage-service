@@ -18,7 +18,7 @@ function testFileType() {
     curl -X DELETE ${TEST_PATH}
 
     echo "Running post of file ${1}"
-    curl -X POST -H "Expect:" -F "new_file=@${1}" ${TEST_PATH}
+    curl -X POST -F "new_file=@${1}" ${TEST_PATH}
     xdg-open ${TEST_PATH}
 }
 
