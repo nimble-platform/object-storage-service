@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-
 if [ "$1" != "build" ] ; then
     echo "Running without build"
 else

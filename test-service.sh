@@ -2,7 +2,30 @@
 
 #NEW_UUID=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 NEW_UUID="ASDJKL3789034ajsdasdjk9384asjdlk"
-TEST_PATH="https://nimble-platform.uk-south.containers.mybluemix.net/object-store/${NEW_UUID}.txt"
+export BASE_PATH
+
+if [ "$1" = "local" ] ; then
+    BASE_PATH="http://localhost:998"
+else
+    BASE_PATH="https://nimble-platform.uk-south.containers.mybluemix.net/object-store"
+fi
+
+
+# Testing for types uploading
+function testFileType() {
+    TEST_PATH="${BASE_PATH}/${1}"
+    echo "Running Delete to ${TEST_PATH} before posting new file"
+    curl -X DELETE ${TEST_PATH}
+
+    echo "Running post of file ${1}"
+    curl -X POST -H "Expect:" -F "new_file=@${1}" ${TEST_PATH}
+    xdg-open ${TEST_PATH}
+}
+
+testFileType "friday-deploy.jpg"
+testFileType "stars.mp4"
+
+TEST_PATH="${BASE_PATH}/${NEW_UUID}.txt"
 
 verify_success() {
     if [[ $? != 0 ]] ; then
@@ -16,7 +39,7 @@ echo ${NEW_UUID} > ${NEW_UUID}.txt
 
 echo "Verifying file is deleted"
 curl -X GET -I ${TEST_PATH} 2> /dev/null | head -n 1|cut -d$' ' -f2 | grep "404" > /dev/null
-[ $? -eq 0 ] || (echo "ERROR curl Response wasn't 404"  && exit 1)
+[ $? -eq 0 ] || ( echo "ERROR curl Response wasn't 404"  && exit 1 )
 
 echo "Sending the file to object store service"
 curl -X POST -d @${NEW_UUID}.txt ${TEST_PATH} 2> /dev/null && verify_success
