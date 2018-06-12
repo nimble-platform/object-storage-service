@@ -42,9 +42,9 @@ public class TokensGenerator {
 
     private void updateTokenIfNeeded() {
         Date current = new Date();
-        Date currentMinusTwentyMinutes = new Date(current.getTime() - (2 * TEN_MINUTES));
-        if (token.getExpires().before(currentMinusTwentyMinutes)) {
-            logger.info("The token will expire in less then 10 minutes - issuing a new one");
+        Date currentPlusTwenty = new Date(current.getTime() + (2 * TEN_MINUTES));
+        if (token.getExpires().before(currentPlusTwenty)) {
+            logger.info("The token will expire in less then 20 minutes - issuing a new one");
 
             OSClientV3 os = builder.authenticate();
             token = os.getToken();

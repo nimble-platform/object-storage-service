@@ -42,7 +42,7 @@ curl -X GET -I ${TEST_PATH} 2> /dev/null | head -n 1|cut -d$' ' -f2 | grep "404"
 [ $? -eq 0 ] || ( echo "ERROR curl Response wasn't 404"  && exit 1 )
 
 echo "Sending the file to object store service"
-curl -X POST -d @${NEW_UUID}.txt ${TEST_PATH} 2> /dev/null && verify_success
+curl -X POST -F "test_file=@${NEW_UUID}.txt" ${TEST_PATH} 2> /dev/null && verify_success
 
 
 echo "Retrieving the file from object store service"
