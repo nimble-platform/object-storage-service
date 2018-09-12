@@ -17,6 +17,16 @@
 package wasdev.sample.servlet;
 
 import com.google.gson.Gson;
+import com.ibm.cloud.objectstorage.ClientConfiguration;
+import com.ibm.cloud.objectstorage.auth.AWSCredentials;
+import com.ibm.cloud.objectstorage.auth.AWSStaticCredentialsProvider;
+import com.ibm.cloud.objectstorage.auth.BasicAWSCredentials;
+import com.ibm.cloud.objectstorage.client.builder.AwsClientBuilder;
+import com.ibm.cloud.objectstorage.oauth.BasicIBMOAuthCredentials;
+import com.ibm.cloud.objectstorage.services.s3.AmazonS3;
+import com.ibm.cloud.objectstorage.services.s3.AmazonS3ClientBuilder;
+import com.ibm.cloud.objectstorage.services.s3.model.ObjectMetadata;
+import com.ibm.cloud.objectstorage.services.s3.model.S3Object;
 import org.apache.commons.fileupload.FileItemIterator;
 import org.apache.commons.fileupload.FileItemStream;
 import org.apache.commons.fileupload.FileUploadException;
@@ -52,18 +62,40 @@ public class SimpleServlet extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
 
-    //	Currently it is hardcoded to use one predefined container;
-    private static final String CONTAINER_NAME = "test";
-    private static TokensGenerator tokensGenerator;
+    //	Currently it is hardcoded to use one predefined bucket;
+    private static final String BUCKET_NAME = "test";
+
+    private static final ObjectStoreCredentials credentials;
+
+    private static final AmazonS3 _cos;
 
     static {
         String credentialsJson = System.getenv("OBJECT_STORE_CREDENTIALS");
         if (isNullOrEmpty(credentialsJson)) {
             throw new IllegalStateException("ERROR !!! - Missing object store credentials environment variable");
         }
-        ObjectStoreCredentials credentials = (new Gson()).fromJson(credentialsJson, ObjectStoreCredentials.class);
+        credentials = (new Gson()).fromJson(credentialsJson, ObjectStoreCredentials.class);
+        logger.info("The new aws credentials have been set");
+        _cos = createClient(credentials.getApikey(), credentials.getResource_instance_id(), credentials.getEndpoints(), "us");
+    }
 
-        tokensGenerator = new TokensGenerator(credentials);
+    static AmazonS3 createClient(String api_key, String service_instance_id, String endpoint_url, String location)
+    {
+        AWSCredentials credentials;
+        if (endpoint_url.contains("objectstorage.softlayer.net")) {
+            credentials = new BasicIBMOAuthCredentials(api_key, service_instance_id);
+        } else {
+            String access_key = api_key;
+            String secret_key = service_instance_id;
+            credentials = new BasicAWSCredentials(access_key, secret_key);
+        }
+        ClientConfiguration clientConfig = new ClientConfiguration().withRequestTimeout(5000);
+        clientConfig.setUseTcpKeepAlive(true);
+
+        AmazonS3 cos = AmazonS3ClientBuilder.standard().withCredentials(new AWSStaticCredentialsProvider(credentials))
+                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint_url, location)).withPathStyleAccessEnabled(true)
+                .withClientConfiguration(clientConfig).build();
+        return cos;
     }
 
     private String getFilenameFromPath(HttpServletRequest request) {
@@ -81,7 +113,7 @@ public class SimpleServlet extends HttpServlet {
      */
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
+//        ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
         String fileName = getFilenameFromPath(request);
 
         if (isNullOrEmpty(fileName)) {
@@ -91,20 +123,22 @@ public class SimpleServlet extends HttpServlet {
         }
         logger.info(String.format("Retrieving file '%s' from ObjectStorage...", fileName));
 
-        SwiftObject fileObj = objectStorage.objects().get(CONTAINER_NAME, fileName);
+
+        S3Object fileObj = _cos.getObject(BUCKET_NAME, fileName);
+//        SwiftObject fileObj = objectStorage.objects().get(BUCKET_NAME, fileName);
 
         if (fileObj == null) { //The specified file was not found
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             logger.error(fileName + " Wasn't found in Object Storage");
             return;
         }
-        long fileSize = fileObj.getSizeInBytes();
-        logger.info(String.format("Sending file '%s' with mime-type '%s' and size '%s' B", fileName, fileObj.getMimeType(), fileSize));
+        long fileSize = fileObj.getObjectMetadata().getContentLength();
+        logger.info(String.format("Sending file '%s' with mime-type '%s' and size '%s' B", fileName, fileObj.getObjectMetadata().getContentEncoding(), fileSize));
 
-        response.setContentType(fileObj.getMimeType());
+        response.setContentType(fileObj.getObjectMetadata().getContentEncoding());
         response.setHeader("Content-disposition", "inline; filename=" + fileName);
 
-        try (InputStream in = fileObj.download().getInputStream();
+        try (InputStream in = fileObj.getObjectContent();
              OutputStream out = response.getOutputStream()) {
             long copied = IOUtils.copy(in, out);
             if (copied != fileSize) {
@@ -126,17 +160,19 @@ public class SimpleServlet extends HttpServlet {
         }
     }
 
-    private void handleWithContentType(HttpServletRequest request, ObjectStorageService objectStorage, String fileName) throws IOException {
+    private void handleWithContentType(HttpServletRequest request, String fileName) throws IOException {
         String mimeType = request.getContentType().split(";")[0];
         logger.info(String.format("Storing file '%s' with mime type '%s' in ObjectStorage...", fileName, mimeType));
 
-        ObjectPutOptions options = ObjectPutOptions.create().contentType(mimeType);
+//        ObjectPutOptions options = ObjectPutOptions.create().contentType(mimeType);
         final InputStream fileStream = request.getInputStream();
-
-        objectStorage.objects().put(CONTAINER_NAME, fileName, Payloads.create(fileStream), options);
+        ObjectMetadata meta = new ObjectMetadata();
+        meta.setContentEncoding(mimeType);
+        _cos.putObject(BUCKET_NAME, fileName, fileStream, meta);
+//        objectStorage.objects().put(BUCKET_NAME, fileName, Payloads.create(fileStream), options);
     }
 
-    private void handleMultiPart(HttpServletRequest request, ObjectStorageService objectStorage, String fileName) throws FileUploadException, IOException {
+    private void handleMultiPart(HttpServletRequest request, String fileName) throws FileUploadException, IOException {
         logger.info(String.format("Storing file '%s' as part of multipart in Object Storage...", fileName));
 
         ServletFileUpload fileUpload = new ServletFileUpload();
@@ -146,10 +182,13 @@ public class SimpleServlet extends HttpServlet {
         while (items.hasNext()) {
             FileItemStream item = items.next();
             logger.info(String.format("Content=%s , Name=%s, field=%s", item.getContentType(), item.getName(), item.getFieldName()));
-            options = ObjectPutOptions.create().contentType(item.getContentType());
+//            options = ObjectPutOptions.create().contentType(item.getContentType());
             if (!item.isFormField()) {
                 InputStream is = item.openStream();
-                objectStorage.objects().put(CONTAINER_NAME, fileName, Payloads.create(is), options);
+                ObjectMetadata meta = new ObjectMetadata();
+                meta.setContentEncoding(item.getContentType());
+                _cos.putObject(BUCKET_NAME, fileName, is, meta);
+//                objectStorage.objects().put(BUCKET_NAME, fileName, Payloads.create(is), options);
             }
         }
     }
@@ -157,7 +196,7 @@ public class SimpleServlet extends HttpServlet {
     //    TODO: maybe change to the native servlet API
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
+//        ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
         String fileName = getFilenameFromPath(request);
         if (isNullOrEmpty(fileName)) { //No file was specified
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
@@ -168,9 +207,9 @@ public class SimpleServlet extends HttpServlet {
 
         try {
             if (ServletFileUpload.isMultipartContent(request)) {
-                handleMultiPart(request, objectStorage, fileName);
+                handleMultiPart(request, fileName);
             } else {
-                handleWithContentType(request, objectStorage, fileName);
+                handleWithContentType(request, fileName);
             }
 
             logger.info(String.format("Successfully stored file '%s' in ObjectStorage!", fileName));
@@ -184,7 +223,7 @@ public class SimpleServlet extends HttpServlet {
 
     @Override
     protected void doDelete(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
+//        ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
         String fileName = getFilenameFromPath(request);
 
         if (isNullOrEmpty(fileName)) { //No file was specified to be found, or container name is missing
@@ -194,14 +233,14 @@ public class SimpleServlet extends HttpServlet {
         }
 
         logger.info(String.format("Deleting file '%s' from ObjectStorage...", fileName));
-        ActionResponse deleteResponse = objectStorage.objects().delete(CONTAINER_NAME, fileName);
+        try {
+            _cos.deleteObject(BUCKET_NAME, fileName);
 
-        if (!deleteResponse.isSuccess()) {
-            response.sendError(deleteResponse.getCode());
-            logger.info("Delete failed for file - " + fileName + " due to: " + deleteResponse.getFault());
-        } else {
-            response.setStatus(HttpServletResponse.SC_OK);
             logger.info("Successfully deleted file from ObjectStorage!");
+            response.setStatus(HttpServletResponse.SC_OK);
+        } catch (Exception e) {
+            logger.error("Error during deletion");
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }
 }

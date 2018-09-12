@@ -5,83 +5,62 @@ package wasdev.sample.servlet;
  */
 
 public class ObjectStoreCredentials {
-    private final String auth_url;
-    private final String project;
-    private final String projectId;
-    private final String region;
-    private final String userId;
-    private final String username;
-    private final String password;
-    private final String domainId;
-    private final String domainName;
-    private final String role;
+    private final String apikey;
+    private final String endpoints;
+    private final String iam_apikey_description;
+    private final String iam_apikey_name;
+    private final String iam_role_crn;
+    private final String iam_serviceid_crn;
+    private final String resource_instance_id;
 
-    public ObjectStoreCredentials(String auth_url, String project, String projectId, String region, String userId, String username, String password , String domainId, String domainName, String role) {
-        this.auth_url = auth_url;
-        this.project = project;
-        this.projectId = projectId;
-        this.region = region;
-        this.userId = userId;
-        this.username = username;
-        this.password = password;
-        this.domainId = domainId;
-        this.domainName = domainName;
-        this.role = role;
+    public ObjectStoreCredentials(String apikey, String endpoints, String iam_apikey_description, String iam_apikey_name, String iam_role_crn, String iam_serviceid_crn, String resource_instance_id) {
+        this.apikey = apikey;
+        this.endpoints = endpoints;
+        this.iam_apikey_description = iam_apikey_description;
+        this.iam_apikey_name = iam_apikey_name;
+        this.iam_role_crn = iam_role_crn;
+        this.iam_serviceid_crn = iam_serviceid_crn;
+        this.resource_instance_id = resource_instance_id;
     }
 
-    public String getAuth_url() {
-        return auth_url;
+    public String getApikey() {
+        return apikey;
     }
 
-    public String getProject() {
-        return project;
+    public String getEndpoints() {
+        return endpoints;
     }
 
-    public String getProjectId() {
-        return projectId;
+    public String getIam_apikey_description() {
+        return iam_apikey_description;
     }
 
-    public String getRegion() {
-        return region;
+    public String getIam_apikey_name() {
+        return iam_apikey_name;
     }
 
-    public String getUserId() {
-        return userId;
+    public String getIam_role_crn() {
+        return iam_role_crn;
     }
 
-    public String getUsername() {
-        return username;
+    public String getIam_serviceid_crn() {
+        return iam_serviceid_crn;
     }
 
-    public String getPassword() {
-        return password;
-    }
-
-    public String getDomainId() {
-        return domainId;
-    }
-
-    public String getDomainName() {
-        return domainName;
-    }
-
-    public String getRole() {
-        return role;
+    public String getResource_instance_id() {
+        return resource_instance_id;
     }
 
     @Override
     public String toString() {
         return "ObjectStoreCredentials{" +
-                "auth_url='" + auth_url + '\'' +
-                ", project='" + project + '\'' +
-                ", projectId='" + projectId + '\'' +
-                ", region='" + region + '\'' +
-                ", userId='" + userId + '\'' +
-                ", username='" + username + '\'' +
-                ", password='" + password + '\'' +
-                ", domainId='" + domainId + '\'' +
-                ", domainName='" + domainName + '\'' +
-                ", role='" + role + '\'' +
+                "apikey='" + apikey + '\'' +
+                ", endpoints='" + endpoints + '\'' +
+                ", iam_apikey_description='" + iam_apikey_description + '\'' +
+                ", iam_apikey_name='" + iam_apikey_name + '\'' +
+                ", iam_role_crn='" + iam_role_crn + '\'' +
+                ", iam_serviceid_crn='" + iam_serviceid_crn + '\'' +
+                ", resource_instance_id='" + resource_instance_id + '\'' +
                 '}';
     }
 }
