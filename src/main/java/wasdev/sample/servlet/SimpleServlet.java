@@ -56,7 +56,9 @@ public class SimpleServlet extends HttpServlet {
     private static final ObjectStoreClient _objStoreClient;
 
     static {
+    	logger.info("trying to initialize servlet with obj store credentials");
         String credentialsJson = System.getenv("OBJECT_STORE_CREDENTIALS");
+        logger.info(credentialsJson);
         if (isNullOrEmpty(credentialsJson)) {
             throw new IllegalStateException("ERROR !!! - Missing object store credentials environment variable");
         }
