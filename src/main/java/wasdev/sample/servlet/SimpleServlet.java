@@ -48,23 +48,20 @@ public class SimpleServlet extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
 
-    //	Currently it is hardcoded to use one predefined bucket;
-    private static final String BUCKET_NAME = "test";
-
     private static final ObjectStoreCredentials creds;
-
     private static final ObjectStoreClient _objStoreClient;
+    private static final String _bucket_name;
 
     static {
     	logger.info("trying to initialize servlet with obj store credentials");
         String credentialsJson = System.getenv("OBJECT_STORE_CREDENTIALS");
-        logger.info(credentialsJson);
         if (isNullOrEmpty(credentialsJson)) {
             throw new IllegalStateException("ERROR !!! - Missing object store credentials environment variable");
         }
         creds = (new Gson()).fromJson(credentialsJson, ObjectStoreCredentials.class);
         logger.info("The new aws credentials have been set");
         
+        _bucket_name = creds.getBucketName();
         _objStoreClient = new ObjectStoreClient(creds.getAuthEndpoint(), creds.getApikey(), creds.getResource_instance_id(), creds.getEndpointUrl(), creds.getEndpointLocation());
     }   
 
@@ -95,7 +92,7 @@ public class SimpleServlet extends HttpServlet {
         
         S3Object fileObj;
         try {
-        	fileObj = _objStoreClient.getObject(BUCKET_NAME, fileName);
+        	fileObj = _objStoreClient.getObject(_bucket_name, fileName);
         }
         catch (ObjectNotFoundException ex) {
         	response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -130,7 +127,7 @@ public class SimpleServlet extends HttpServlet {
         final InputStream fileStream = request.getInputStream();
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentEncoding(mimeType);
-        _objStoreClient.createObject(BUCKET_NAME, fileName, fileStream, metadata);
+        _objStoreClient.createObject(_bucket_name, fileName, fileStream, metadata);
     }
 
     private void handleMultiPart(HttpServletRequest request, String fileName) throws FileUploadException, IOException {
@@ -145,7 +142,7 @@ public class SimpleServlet extends HttpServlet {
                 InputStream stream = item.openStream();
                 ObjectMetadata metadata = new ObjectMetadata(); 
         	    metadata.setContentType(item.getContentType()); 
-                _objStoreClient.createObject(BUCKET_NAME, fileName, stream, metadata);
+                _objStoreClient.createObject(_bucket_name, fileName, stream, metadata);
             }
         }
     }
@@ -189,7 +186,7 @@ public class SimpleServlet extends HttpServlet {
 
         logger.info(String.format("Deleting file '%s' from ObjectStorage...", fileName));
         try {
-            _objStoreClient.deleteObject(BUCKET_NAME, fileName);
+            _objStoreClient.deleteObject(_bucket_name, fileName);
 
             logger.info("Successfully deleted file from ObjectStorage!");
             response.setStatus(HttpServletResponse.SC_OK);
