@@ -1,5 +1,5 @@
 FROM tomcat
-MAINTAINER evgeniyh@il.ibm.com
+MAINTAINER nirro@il.ibm.com
 
 RUN rm -rf /usr/local/tomcat/webapps/*
 
