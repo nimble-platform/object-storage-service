@@ -81,6 +81,7 @@ public class SimpleServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 //        ObjectStorageService objectStorage = OSFactory.clientFromToken(tokensGenerator.getToken()).objectStorage();
+    	addCorsHeaders(response);
         String fileName = getFilenameFromPath(request);
         if (isNullOrEmpty(fileName)) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -127,6 +128,7 @@ public class SimpleServlet extends HttpServlet {
         final InputStream fileStream = request.getInputStream();
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentEncoding(mimeType);
+        metadata.setContentType(mimeType);
         _objStoreClient.createObject(_bucket_name, fileName, fileStream, metadata);
     }
 
@@ -150,7 +152,8 @@ public class SimpleServlet extends HttpServlet {
     //    TODO: maybe change to the native servlet API
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String fileName = getFilenameFromPath(request);
+    	addCorsHeaders(response);
+    	String fileName = getFilenameFromPath(request);
         if (isNullOrEmpty(fileName)) { //No file was specified
             response.sendError(HttpServletResponse.SC_BAD_REQUEST);
             response.getOutputStream().print("Must provide a filename");
@@ -176,6 +179,7 @@ public class SimpleServlet extends HttpServlet {
 
     @Override
     protected void doDelete(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    	addCorsHeaders(response);
         String fileName = getFilenameFromPath(request);
 
         if (isNullOrEmpty(fileName)) { //No file was specified to be found, or container name is missing
@@ -194,5 +198,12 @@ public class SimpleServlet extends HttpServlet {
             logger.error("Error during deletion");
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
+    }
+    
+    private void addCorsHeaders(HttpServletResponse response) {
+        response.addHeader("Access-Control-Allow-Origin", "*");
+        response.addHeader("Access-Control-Allow-Credentials", "true");
+        response.addHeader("Access-Control-Allow-Headers", "origin, content-type, accept, authorization");
+        response.addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH");
     }
 }
